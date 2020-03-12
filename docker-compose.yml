@@ -1,0 +1,66 @@
+version: '3'
+
+services:
+
+  webpacker:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    env_file:
+      - '.env.docker'
+    command: ./bin/webpack-dev-server
+    volumes:
+      - .:/app
+      # up時、node_modulesエラー解消
+      - /app/node_modules
+    ports:
+      - '3035:3035'
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    tty: true
+    stdin_open: true
+    command: bash -c "rm -f tmp/pids/server.pid && bundle exec rails s -p 3000 -b '0.0.0.0'"
+    volumes:
+      - .:/app
+      - bundle:/usr/local/bundle
+      - /var/tmp
+    depends_on:
+      - db
+
+  db:
+    image: mysql:8.0.16
+    command: --default-authentication-plugin=mysql_native_password
+    restart: always
+    environment:
+      MYSQL_HOST: 127.0.0.1
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: myapp_production
+      MYSQL_USERNAME: root
+    security_opt:
+      - seccomp:unconfined
+    ports:
+      - "3306:3306"
+    volumes:
+      -  mysql_data:/var/lib/mysql
+
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile.nginx
+    ports:
+      - 80:80
+    volumes:
+      - ./docker/nginx/log:/var/log/nginx
+      - public-data:/todoapp/public
+    depends_on:
+      - app
+
+volumes:
+  bundle:
+  mysql_data:
+  public-data:
